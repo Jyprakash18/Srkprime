@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
+from aiohttp import web
 from typing import Optional
 
 import aiosqlite
@@ -466,13 +467,26 @@ async def expiry_worker():
 
         await asyncio.sleep(3600)  # check every 1 hour
 
+async def health_check(request):
+    return web.Response(text="Bot is running")
 
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", health_check)
+    app.router.add_get("/health", health_check)
+
+    port = int(os.environ.get("PORT", 10000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+    print(f"Web server started on port {port}")
 async def main():
-    logging.basicConfig(level=logging.INFO)
     await init_db()
+    await start_web_server()
+
     asyncio.create_task(expiry_worker())
+
     await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
